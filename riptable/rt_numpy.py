@@ -1109,19 +1109,35 @@ def _ismember_align_multikey(a, b):
             col = col.expand_array
         return col
 
+    def _is_multikey_categorical(col):
+        return isinstance(col, TypeRegister.Categorical) and col.ismultikey
+
+    def _expand_multikey_to_singlekey_categoricals(col):
+        new_cols = []
+        values = col.view(TypeRegister.FastArray)
+        for category in col.category_dict.values():
+            if _is_multikey_categorical(category):
+                new_cols.extend(_expand_multikey_to_singlekey_categoricals(category))
+            else:
+                new_cols.append(TypeRegister.Categorical(values, categories=category))
+        return new_cols
+
+    def _expand_columns(cols):
+        new_cols = []
+        for col in cols:
+            if _is_multikey_categorical(col):
+                new_cols.extend(_expand_multikey_to_singlekey_categoricals(col))
+            else:
+                new_cols.append(col)
+        return new_cols
+
+
     allowed_int = "bhilqpBHILQP"
     allowed_float = "fdg"
     allowed_types = allowed_int + allowed_float
 
-    # make sure original container items don't get blown away during fixup
-    if isinstance(a, tuple):
-        a = list(a)
-    if isinstance(b, tuple):
-        b = list(b)
-    if isinstance(a, list):
-        a = a.copy()
-    if isinstance(b, list):
-        b = b.copy()
+    a = _expand_columns(a)
+    b = _expand_columns(b)
 
     for idx, a_col in enumerate(a):
         b_col = b[idx]
